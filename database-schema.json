@@ -1,0 +1,37 @@
+{
+  "database": "neon_postgres",
+  "version": "1.0.0",
+  "tables": {
+    "pages": {
+      "columns": [
+        { "name": "id", "type": "integer", "primary": true },
+        { "name": "title", "type": "varchar(255)", "required": true },
+        { "name": "slug", "type": "varchar(255)", "unique": true },
+        { "name": "content", "type": "text" },
+        { "name": "status", "type": "varchar(20)" },
+        { "name": "created_at", "type": "timestamp" }
+      ]
+    },
+    "blog_posts": {
+      "columns": [
+        { "name": "id", "type": "integer", "primary": true },
+        { "name": "title", "type": "varchar(500)", "required": true },
+        { "name": "slug", "type": "varchar(500)", "unique": true },
+        { "name": "content", "type": "text" },
+        { "name": "status", "type": "varchar(20)" },
+        { "name": "category_id", "type": "integer", "foreign_key": "blog_categories.id" }
+      ]
+    },
+    "menu_items": {
+      "columns": [
+        { "name": "id", "type": "integer", "primary": true },
+        { "name": "title", "type": "varchar(255)", "required": true },
+        { "name": "url", "type": "varchar(500)" },
+        { "name": "menu_location", "type": "varchar(50)" },
+        { "name": "menu_order", "type": "integer" }
+      ]
+    }
+  },
+  "status": "active",
+  "last_updated": "2024-06-23"
+}
