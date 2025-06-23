@@ -1,76 +1,84 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless"
 
-const sql = neon(process.env.DATABASE_URL!)
+let sql: NeonQueryFunction<false, false>
 
+try {
+  if (!process.env.DATABASE_URL) {
+    console.error("CRITICAL: PAGES/[id] API - DATABASE_URL not set.")
+    throw new Error("DATABASE_URL not set")
+  }
+  sql = neon(process.env.DATABASE_URL!)
+} catch (e: any) {
+  console.error("CRITICAL: PAGES/[id] API - Failed to initialize Neon SQL client:", e.message)
+  // sql kalacak tanımsız veya hatalı, aşağıdaki handler'lar bunu kontrol etmeli
+}
+
+// Belirli bir sayfayı ID ile getir
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  if (!sql || typeof sql !== "function") {
+    console.error("PAGES/[id] API GET: SQL client not initialized.")
+    return NextResponse.json({ error: "Database connection failed." }, { status: 500 })
+  }
   try {
     const id = Number.parseInt(params.id)
-
-    const result = await sql`
-      SELECT * FROM pages WHERE id = ${id}
-    `
-
-    if (result.length === 0) {
-      return NextResponse.json({ error: "Page not found" }, { status: 404 })
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid page ID" }, { status: 400 })
     }
 
-    return NextResponse.json(result[0])
-  } catch (error) {
-    console.error("Page GET Error:", error)
-    return NextResponse.json({ error: "Failed to fetch page" }, { status: 500 })
-  }
-}
-
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const id = Number.parseInt(params.id)
-    const data = await request.json()
-
-    const result = await sql`
-      UPDATE pages 
-      SET 
-        title = COALESCE(${data.title}, title),
-        slug = COALESCE(${data.slug}, slug),
-        content = COALESCE(${data.content}, content),
-        excerpt = COALESCE(${data.excerpt}, excerpt),
-        status = COALESCE(${data.status}, status),
-        language = COALESCE(${data.language}, language),
-        seo_title = COALESCE(${data.seo_title}, seo_title),
-        seo_description = COALESCE(${data.seo_description}, seo_description),
-        template = COALESCE(${data.template}, template),
-        updated_at = CURRENT_TIMESTAMP
+    const page = await sql`
+      SELECT 
+        id, title, slug, content, excerpt, status, language,
+        seo_title, seo_description, template, views, 
+        published_at, created_at, updated_at, author_id, parent_id, menu_order,
+        noindex, canonical_url, og_title, og_description, og_image,
+        custom_css, custom_js, featured_image
+      FROM pages 
       WHERE id = ${id}
-      RETURNING *
     `
 
-    if (result.length === 0) {
+    if (page.length === 0) {
       return NextResponse.json({ error: "Page not found" }, { status: 404 })
     }
-
-    return NextResponse.json(result[0])
-  } catch (error) {
-    console.error("Page PUT Error:", error)
-    return NextResponse.json({ error: "Failed to update page" }, { status: 500 })
+    return NextResponse.json(page[0])
+  } catch (error: any) {
+    console.error(`PAGES/[id] API GET Error (ID: ${params.id}):`, {
+      message: error.message,
+      stack: error.stack,
+      pgErrorCode: error.code,
+    })
+    return NextResponse.json({ error: "Failed to fetch page." }, { status: 500 })
   }
 }
 
+// Belirli bir sayfayı ID ile sil
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  if (!sql || typeof sql !== "function") {
+    console.error("PAGES/[id] API DELETE: SQL client not initialized.")
+    return NextResponse.json({ error: "Database connection failed." }, { status: 500 })
+  }
   try {
     const id = Number.parseInt(params.id)
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid page ID" }, { status: 400 })
+    }
 
     const result = await sql`
-      DELETE FROM pages WHERE id = ${id}
+      DELETE FROM pages 
+      WHERE id = ${id}
       RETURNING id
     `
 
     if (result.length === 0) {
-      return NextResponse.json({ error: "Page not found" }, { status: 404 })
+      return NextResponse.json({ error: "Page not found or could not be deleted" }, { status: 404 })
     }
-
-    return NextResponse.json({ message: "Page deleted successfully" })
-  } catch (error) {
-    console.error("Page DELETE Error:", error)
-    return NextResponse.json({ error: "Failed to delete page" }, { status: 500 })
+    return NextResponse.json({ message: "Page deleted successfully", id: result[0].id })
+  } catch (error: any) {
+    console.error(`PAGES/[id] API DELETE Error (ID: ${params.id}):`, {
+      message: error.message,
+      stack: error.stack,
+      pgErrorCode: error.code,
+    })
+    return NextResponse.json({ error: "Failed to delete page." }, { status: 500 })
   }
 }

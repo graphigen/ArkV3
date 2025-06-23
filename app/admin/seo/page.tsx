@@ -2,56 +2,47 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Progress } from "@/components/ui/progress"
-import { toast } from "sonner"
+import { Switch } from "@/components/ui/switch"
 import {
   Plus,
   Edit,
   Trash2,
   ExternalLink,
   TrendingUp,
-  AlertCircle,
+  TrendingDown,
+  AlertTriangle,
   CheckCircle,
-  Info,
-  ArrowUp,
-  ArrowDown,
-  Minus,
-  Download,
+  MoreHorizontal,
   RefreshCw,
+  Settings,
   Zap,
+  Globe,
+  FileText,
 } from "lucide-react"
-
-interface SEOSettings {
-  siteName?: string
-  siteDescription?: string
-  defaultOgImage?: string
-  googleAnalyticsId?: string
-  googleTagManagerId?: string
-  robotsTxt?: string
-  enableBreadcrumbs?: boolean
-  enableSchemaMarkup?: boolean
-  enableOpenGraph?: boolean
-  enableTwitterCards?: boolean
-}
-
-interface SEORedirect {
-  id?: number
-  fromUrl: string
-  toUrl: string
-  redirectType: number
-  isActive: boolean
-  hitCount?: number
-}
+import { toast } from "sonner"
 
 interface SEOAnalysis {
   overview: {
@@ -67,7 +58,10 @@ interface SEOAnalysis {
     type: "error" | "warning" | "info"
     title: string
     description: string
-    pages: Array<{ url: string; title: string }>
+    pages: Array<{
+      url: string
+      title: string
+    }>
     priority: "high" | "medium" | "low"
     impact: string
   }>
@@ -86,101 +80,82 @@ interface SEOAnalysis {
     difficulty: number
     trend: "up" | "down" | "stable"
   }>
+  competitors: Array<{
+    domain: string
+    score: number
+    commonKeywords: number
+    backlinks: number
+  }>
+}
+
+interface SEORedirect {
+  id: number
+  fromUrl: string
+  toUrl: string
+  redirectType: number
+  isActive: boolean
+  hitCount: number
+  createdAt: string
+  updatedAt: string
 }
 
 export default function SEOPage() {
-  const [settings, setSettings] = useState<SEOSettings>({})
-  const [redirects, setRedirects] = useState<SEORedirect[]>([])
   const [analysis, setAnalysis] = useState<SEOAnalysis | null>(null)
+  const [redirects, setRedirects] = useState<SEORedirect[]>([])
   const [loading, setLoading] = useState(true)
-  const [analysisLoading, setAnalysisLoading] = useState(false)
-  const [toolsLoading, setToolsLoading] = useState<string | null>(null)
-  const [newRedirect, setNewRedirect] = useState<Partial<SEORedirect>>({
+  const [isCreateRedirectOpen, setIsCreateRedirectOpen] = useState(false)
+  const [isEditRedirectOpen, setIsEditRedirectOpen] = useState(false)
+  const [editingRedirect, setEditingRedirect] = useState<SEORedirect | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isRunningTools, setIsRunningTools] = useState(false)
+
+  const [newRedirect, setNewRedirect] = useState({
+    fromUrl: "",
+    toUrl: "",
     redirectType: 301,
     isActive: true,
   })
 
   useEffect(() => {
-    fetchSEOSettings()
+    fetchSEOAnalysis()
     fetchRedirects()
   }, [])
 
-  const fetchSEOSettings = async () => {
+  const fetchSEOAnalysis = async () => {
     try {
-      const response = await fetch("/api/admin/seo/settings")
-      if (!response.ok) throw new Error("Failed to fetch")
-      const data = await response.json()
-      setSettings(data)
+      const response = await fetch("/api/admin/seo/analysis")
+      if (response.ok) {
+        const data = await response.json()
+        setAnalysis(data)
+      }
     } catch (error) {
-      console.error("SEO settings fetch error:", error)
-      toast.error("SEO ayarları yüklenemedi")
-      // Set default values on error
-      setSettings({
-        siteName: "Arkkontrol",
-        siteDescription: "Endüstriyel otomasyon ve robotik kaynak çözümleri",
-        enableBreadcrumbs: true,
-        enableSchemaMarkup: true,
-        enableOpenGraph: true,
-        enableTwitterCards: true,
-      })
+      console.error("SEO analysis fetch error:", error)
+      toast.error("SEO analizi yüklenirken hata oluştu")
     }
   }
 
   const fetchRedirects = async () => {
     try {
       const response = await fetch("/api/admin/seo/redirects")
-      if (!response.ok) throw new Error("Failed to fetch")
-      const data = await response.json()
-      setRedirects(data)
+      if (response.ok) {
+        const data = await response.json()
+        setRedirects(data)
+      }
     } catch (error) {
       console.error("Redirects fetch error:", error)
-      toast.error("Yönlendirmeler yüklenemedi")
+      toast.error("Yönlendirmeler yüklenirken hata oluştu")
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchAnalysis = async () => {
-    setAnalysisLoading(true)
-    try {
-      const response = await fetch("/api/admin/seo/analysis")
-      if (!response.ok) throw new Error("Failed to fetch")
-      const data = await response.json()
-      setAnalysis(data)
-      toast.success("SEO analizi tamamlandı")
-    } catch (error) {
-      console.error("Analysis fetch error:", error)
-      toast.error("SEO analizi yüklenemedi")
-    } finally {
-      setAnalysisLoading(false)
-    }
-  }
-
-  const saveSEOSettings = async () => {
-    try {
-      const response = await fetch("/api/admin/seo/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      })
-
-      if (!response.ok) throw new Error("Failed to save")
-
-      const data = await response.json()
-      setSettings(data)
-      toast.success("SEO ayarları kaydedildi")
-    } catch (error) {
-      console.error("Settings save error:", error)
-      toast.error("SEO ayarları kaydedilemedi")
-    }
-  }
-
-  const createRedirect = async () => {
+  const handleCreateRedirect = async () => {
     if (!newRedirect.fromUrl || !newRedirect.toUrl) {
-      toast.error("Kaynak ve hedef URL gerekli")
+      toast.error("Kaynak ve hedef URL gereklidir")
       return
     }
 
+    setIsSaving(true)
     try {
       const response = await fetch("/api/admin/seo/redirects", {
         method: "POST",
@@ -188,35 +163,84 @@ export default function SEOPage() {
         body: JSON.stringify(newRedirect),
       })
 
-      if (!response.ok) throw new Error("Failed to create")
-
-      toast.success("Yönlendirme oluşturuldu")
-      setNewRedirect({ redirectType: 301, isActive: true })
-      fetchRedirects()
+      if (response.ok) {
+        const createdRedirect = await response.json()
+        setRedirects([createdRedirect, ...redirects])
+        setIsCreateRedirectOpen(false)
+        setNewRedirect({ fromUrl: "", toUrl: "", redirectType: 301, isActive: true })
+        toast.success("Yönlendirme başarıyla oluşturuldu")
+      } else {
+        toast.error("Yönlendirme oluşturulamadı")
+      }
     } catch (error) {
-      console.error("Redirect create error:", error)
+      console.error("Redirect creation error:", error)
       toast.error("Yönlendirme oluşturulamadı")
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  const deleteRedirect = async (id: number) => {
+  const handleEditRedirect = (redirect: SEORedirect) => {
+    setEditingRedirect(redirect)
+    setNewRedirect({
+      fromUrl: redirect.fromUrl,
+      toUrl: redirect.toUrl,
+      redirectType: redirect.redirectType,
+      isActive: redirect.isActive,
+    })
+    setIsEditRedirectOpen(true)
+  }
+
+  const handleUpdateRedirect = async () => {
+    if (!editingRedirect) return
+
+    setIsSaving(true)
+    try {
+      const response = await fetch(`/api/admin/seo/redirects/${editingRedirect.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newRedirect),
+      })
+
+      if (response.ok) {
+        const updatedRedirect = await response.json()
+        setRedirects(redirects.map((r) => (r.id === editingRedirect.id ? updatedRedirect : r)))
+        setIsEditRedirectOpen(false)
+        setEditingRedirect(null)
+        toast.success("Yönlendirme başarıyla güncellendi")
+      } else {
+        toast.error("Yönlendirme güncellenemedi")
+      }
+    } catch (error) {
+      console.error("Redirect update error:", error)
+      toast.error("Yönlendirme güncellenirken hata oluştu")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleDeleteRedirect = async (id: number) => {
+    if (!confirm("Bu yönlendirmeyi silmek istediğinizden emin misiniz?")) return
+
     try {
       const response = await fetch(`/api/admin/seo/redirects/${id}`, {
         method: "DELETE",
       })
 
-      if (!response.ok) throw new Error("Failed to delete")
-
-      toast.success("Yönlendirme silindi")
-      fetchRedirects()
+      if (response.ok) {
+        setRedirects(redirects.filter((redirect) => redirect.id !== id))
+        toast.success("Yönlendirme silindi")
+      } else {
+        toast.error("Yönlendirme silinirken hata oluştu")
+      }
     } catch (error) {
-      console.error("Redirect delete error:", error)
-      toast.error("Yönlendirme silinemedi")
+      console.error("Redirect deletion error:", error)
+      toast.error("Yönlendirme silinirken hata oluştu")
     }
   }
 
-  const executeTool = async (action: string, actionName: string) => {
-    setToolsLoading(action)
+  const runSEOTool = async (action: string) => {
+    setIsRunningTools(true)
     try {
       const response = await fetch("/api/admin/seo/tools", {
         method: "POST",
@@ -224,53 +248,64 @@ export default function SEOPage() {
         body: JSON.stringify({ action }),
       })
 
-      if (!response.ok) throw new Error("Failed to execute tool")
+      const result = await response.json()
 
-      const data = await response.json()
-      toast.success(data.message)
-
-      if (action === "reanalyze") {
-        setAnalysis(null)
-        setTimeout(() => fetchAnalysis(), 1000)
+      if (result.success) {
+        toast.success(result.message)
+        if (action === "generate_sitemap" && result.sitemap) {
+          // Show sitemap in a dialog or download it
+          const blob = new Blob([result.sitemap], { type: "application/xml" })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement("a")
+          a.href = url
+          a.download = "sitemap.xml"
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+        }
+      } else {
+        toast.error(result.message)
       }
     } catch (error) {
-      console.error(`Tool ${action} error:`, error)
-      toast.error(`${actionName} başarısız`)
+      console.error("SEO tool error:", error)
+      toast.error("İşlem gerçekleştirilirken hata oluştu")
     } finally {
-      setToolsLoading(null)
+      setIsRunningTools(false)
     }
   }
 
   const getIssueIcon = (type: string) => {
     switch (type) {
       case "error":
-        return <AlertCircle className="h-5 w-5 text-red-500" />
+        return <AlertTriangle className="h-4 w-4 text-red-500" />
       case "warning":
-        return <AlertCircle className="h-5 w-5 text-yellow-500" />
+        return <AlertTriangle className="h-4 w-4 text-yellow-500" />
       case "info":
-        return <Info className="h-5 w-5 text-blue-500" />
+        return <CheckCircle className="h-4 w-4 text-blue-500" />
       default:
-        return <Info className="h-5 w-5 text-gray-500" />
+        return <CheckCircle className="h-4 w-4 text-gray-500" />
     }
   }
 
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case "up":
-        return <ArrowUp className="h-4 w-4 text-green-500" />
-      case "down":
-        return <ArrowDown className="h-4 w-4 text-red-500" />
-      default:
-        return <Minus className="h-4 w-4 text-gray-500" />
-    }
+  const getIssueBadge = (type: string) => {
+    const variants = {
+      error: "destructive",
+      warning: "secondary",
+      info: "outline",
+    } as const
+
+    return <Badge variant={variants[type as keyof typeof variants]}>{type.toUpperCase()}</Badge>
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>SEO verileri yükleniyor...</p>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">SEO Yönetimi</h1>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="h-8 w-8 animate-spin" />
         </div>
       </div>
     )
@@ -278,573 +313,490 @@ export default function SEOPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">SEO Yönetimi</h1>
-        <p className="text-muted-foreground">Site SEO ayarları, yönlendirmeler ve optimizasyon araçları</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">SEO Yönetimi</h1>
+          <p className="text-muted-foreground">Sitenizin SEO performansını optimize edin</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={fetchSEOAnalysis}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Analizi Yenile
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Zap className="h-4 w-4 mr-2" />
+                SEO Araçları
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>SEO Araçları</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => runSEOTool("generate_sitemap")} disabled={isRunningTools}>
+                <FileText className="mr-2 h-4 w-4" />
+                Sitemap Oluştur
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => runSEOTool("clear_cache")} disabled={isRunningTools}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Cache Temizle
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => runSEOTool("test_robots")} disabled={isRunningTools}>
+                <Settings className="mr-2 h-4 w-4" />
+                Robots.txt Test
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => runSEOTool("submit_sitemap")} disabled={isRunningTools}>
+                <Globe className="mr-2 h-4 w-4" />
+                Google'a Sitemap Gönder
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      <Tabs defaultValue="settings" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="settings">Genel Ayarlar</TabsTrigger>
-          <TabsTrigger value="redirects">Yönlendirmeler</TabsTrigger>
-          <TabsTrigger value="analysis">SEO Analizi</TabsTrigger>
-          <TabsTrigger value="tools">Araçlar</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="settings" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Site Bilgileri</CardTitle>
-              <CardDescription>Temel site bilgileri ve meta verileri</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="siteName">Site Adı</Label>
-                  <Input
-                    id="siteName"
-                    value={settings.siteName || ""}
-                    onChange={(e) => setSettings({ ...settings, siteName: e.target.value })}
-                    placeholder="Arkkontrol"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="siteDescription">Site Açıklaması</Label>
-                  <Input
-                    id="siteDescription"
-                    value={settings.siteDescription || ""}
-                    onChange={(e) => setSettings({ ...settings, siteDescription: e.target.value })}
-                    placeholder="Robotik otomasyon çözümleri"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="defaultOgImage">Varsayılan Open Graph Resmi</Label>
-                <Input
-                  id="defaultOgImage"
-                  value={settings.defaultOgImage || ""}
-                  onChange={(e) => setSettings({ ...settings, defaultOgImage: e.target.value })}
-                  placeholder="https://arkkontrol.com/og-image.jpg"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Analitik Kodları</CardTitle>
-              <CardDescription>Google Analytics, Tag Manager ve diğer takip kodları</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="googleAnalyticsId">Google Analytics ID</Label>
-                  <Input
-                    id="googleAnalyticsId"
-                    value={settings.googleAnalyticsId || ""}
-                    onChange={(e) => setSettings({ ...settings, googleAnalyticsId: e.target.value })}
-                    placeholder="G-XXXXXXXXXX"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="googleTagManagerId">Google Tag Manager ID</Label>
-                  <Input
-                    id="googleTagManagerId"
-                    value={settings.googleTagManagerId || ""}
-                    onChange={(e) => setSettings({ ...settings, googleTagManagerId: e.target.value })}
-                    placeholder="GTM-XXXXXXX"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>SEO Özellikleri</CardTitle>
-              <CardDescription>SEO optimizasyon özelliklerini etkinleştirin</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Breadcrumb Navigation</Label>
-                  <p className="text-sm text-muted-foreground">Sayfalarda breadcrumb navigasyonu göster</p>
-                </div>
-                <Switch
-                  checked={settings.enableBreadcrumbs || false}
-                  onCheckedChange={(checked) => setSettings({ ...settings, enableBreadcrumbs: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Schema Markup</Label>
-                  <p className="text-sm text-muted-foreground">Yapılandırılmış veri işaretlemesi ekle</p>
-                </div>
-                <Switch
-                  checked={settings.enableSchemaMarkup || false}
-                  onCheckedChange={(checked) => setSettings({ ...settings, enableSchemaMarkup: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Open Graph</Label>
-                  <p className="text-sm text-muted-foreground">Sosyal medya paylaşım meta verileri</p>
-                </div>
-                <Switch
-                  checked={settings.enableOpenGraph || false}
-                  onCheckedChange={(checked) => setSettings({ ...settings, enableOpenGraph: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Twitter Cards</Label>
-                  <p className="text-sm text-muted-foreground">Twitter paylaşım kartları</p>
-                </div>
-                <Switch
-                  checked={settings.enableTwitterCards || false}
-                  onCheckedChange={(checked) => setSettings({ ...settings, enableTwitterCards: checked })}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Robots.txt</CardTitle>
-              <CardDescription>Arama motoru botları için yönergeler</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                value={settings.robotsTxt || ""}
-                onChange={(e) => setSettings({ ...settings, robotsTxt: e.target.value })}
-                placeholder={`User-agent: *
-Allow: /
-Disallow: /admin/
-Disallow: /api/
-
-Sitemap: https://arkkontrol.com/sitemap.xml`}
-                rows={8}
-              />
-            </CardContent>
-          </Card>
-
-          <Button onClick={saveSEOSettings} className="w-full">
-            SEO Ayarlarını Kaydet
-          </Button>
-        </TabsContent>
-
-        <TabsContent value="redirects" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                URL Yönlendirmeleri
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Yeni Yönlendirme
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Yeni Yönlendirme Oluştur</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="fromUrl">Kaynak URL</Label>
-                        <Input
-                          id="fromUrl"
-                          value={newRedirect.fromUrl || ""}
-                          onChange={(e) => setNewRedirect({ ...newRedirect, fromUrl: e.target.value })}
-                          placeholder="/eski-sayfa"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="toUrl">Hedef URL</Label>
-                        <Input
-                          id="toUrl"
-                          value={newRedirect.toUrl || ""}
-                          onChange={(e) => setNewRedirect({ ...newRedirect, toUrl: e.target.value })}
-                          placeholder="/yeni-sayfa"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="redirectType">Yönlendirme Tipi</Label>
-                        <Select
-                          value={newRedirect.redirectType?.toString()}
-                          onValueChange={(value) =>
-                            setNewRedirect({ ...newRedirect, redirectType: Number.parseInt(value) })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="301">301 - Kalıcı Yönlendirme</SelectItem>
-                            <SelectItem value="302">302 - Geçici Yönlendirme</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="isActive"
-                          checked={newRedirect.isActive || false}
-                          onCheckedChange={(checked) => setNewRedirect({ ...newRedirect, isActive: checked })}
-                        />
-                        <Label htmlFor="isActive">Aktif</Label>
-                      </div>
-                      <Button onClick={createRedirect} className="w-full">
-                        Yönlendirme Oluştur
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Kaynak URL</TableHead>
-                    <TableHead>Hedef URL</TableHead>
-                    <TableHead>Tip</TableHead>
-                    <TableHead>Durum</TableHead>
-                    <TableHead>Hit Sayısı</TableHead>
-                    <TableHead>İşlemler</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {redirects.map((redirect) => (
-                    <TableRow key={redirect.id}>
-                      <TableCell className="font-mono text-sm">{redirect.fromUrl}</TableCell>
-                      <TableCell className="font-mono text-sm">{redirect.toUrl}</TableCell>
-                      <TableCell>
-                        <Badge variant={redirect.redirectType === 301 ? "default" : "secondary"}>
-                          {redirect.redirectType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={redirect.isActive ? "default" : "secondary"}>
-                          {redirect.isActive ? "Aktif" : "Pasif"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{redirect.hitCount || 0}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Button variant="ghost" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => redirect.id && deleteRedirect(redirect.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="analysis" className="space-y-4">
-          {!analysis ? (
+      {analysis && (
+        <>
+          {/* SEO Overview */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
             <Card>
-              <CardHeader>
-                <CardTitle>SEO Analizi</CardTitle>
-                <CardDescription>Site SEO performansını analiz edin</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">SEO Skoru</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <Button onClick={fetchAnalysis} disabled={analysisLoading}>
-                  {analysisLoading ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Analiz ediliyor...
-                    </>
-                  ) : (
-                    <>
-                      <TrendingUp className="h-4 w-4 mr-2" />
-                      SEO Analizi Başlat
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">SEO Skoru</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{analysis.overview.seoScore}</div>
-                    <Progress value={analysis.overview.seoScore} className="mt-2" />
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Toplam Sayfa</CardTitle>
-                    <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{analysis.overview.totalPages}</div>
-                    <p className="text-xs text-muted-foreground">
-                      {analysis.overview.goodPages} iyi, {analysis.overview.warningPages} uyarı
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Eksik Meta</CardTitle>
-                    <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{analysis.overview.missingMeta}</div>
-                    <p className="text-xs text-muted-foreground">Düzeltilmesi gereken</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Hata Sayısı</CardTitle>
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{analysis.overview.errorPages}</div>
-                    <p className="text-xs text-muted-foreground">Kritik sorunlar</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>SEO Sorunları</CardTitle>
-                  <CardDescription>Düzeltilmesi gereken SEO sorunları</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {analysis.issues.map((issue) => (
-                      <div key={issue.id} className="flex items-start space-x-4 p-4 border rounded-lg">
-                        {getIssueIcon(issue.type)}
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-medium">{issue.title}</h4>
-                            <Badge
-                              variant={
-                                issue.priority === "high"
-                                  ? "destructive"
-                                  : issue.priority === "medium"
-                                    ? "default"
-                                    : "secondary"
-                              }
-                            >
-                              {issue.priority === "high" ? "Yüksek" : issue.priority === "medium" ? "Orta" : "Düşük"}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">{issue.description}</p>
-                          <p className="text-xs text-muted-foreground mt-2">Etki: {issue.impact}</p>
-                          <div className="mt-2">
-                            <p className="text-xs font-medium">Etkilenen sayfalar:</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {issue.pages.slice(0, 3).map((page, index) => (
-                                <Badge key={index} variant="outline" className="text-xs">
-                                  {page.url}
-                                </Badge>
-                              ))}
-                              {issue.pages.length > 3 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{issue.pages.length - 3} daha
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Düzelt
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Öneriler</CardTitle>
-                    <CardDescription>SEO skorunuzu artırmak için öneriler</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {analysis.recommendations.map((rec) => (
-                        <div key={rec.id} className="p-3 border rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <h5 className="font-medium text-sm">{rec.title}</h5>
-                            <Badge variant="outline" className="text-xs">
-                              {rec.effort}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mb-2">{rec.description}</p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-green-600 font-medium">{rec.impact}</span>
-                            <Badge variant="secondary" className="text-xs">
-                              {rec.category}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Anahtar Kelime Performansı</CardTitle>
-                    <CardDescription>Takip edilen anahtar kelimelerin durumu</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {analysis.keywords.map((keyword, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium text-sm">{keyword.keyword}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Arama: {keyword.searchVolume.toLocaleString()} | Zorluk: {keyword.difficulty}
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Badge variant="outline">#{keyword.position}</Badge>
-                            {getTrendIcon(keyword.trend)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </>
-          )}
-        </TabsContent>
-
-        <TabsContent value="tools" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Sitemap Oluştur</CardTitle>
-                <CardDescription>XML sitemap dosyasını yeniden oluştur</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  className="w-full"
-                  onClick={() => executeTool("generate_sitemap", "Sitemap oluşturma")}
-                  disabled={toolsLoading === "generate_sitemap"}
-                >
-                  {toolsLoading === "generate_sitemap" ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Oluşturuluyor...
-                    </>
-                  ) : (
-                    <>
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Sitemap Oluştur
-                    </>
-                  )}
-                </Button>
+                <div className="text-2xl font-bold">{analysis.overview.seoScore}/100</div>
+                <div className="text-xs text-muted-foreground">
+                  {analysis.overview.seoScore >= 80
+                    ? "Mükemmel"
+                    : analysis.overview.seoScore >= 60
+                      ? "İyi"
+                      : "Geliştirilmeli"}
+                </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Cache Temizle</CardTitle>
-                <CardDescription>SEO verilerinin cache'ini temizle</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Toplam Sayfa</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => executeTool("clear_cache", "Cache temizleme")}
-                  disabled={toolsLoading === "clear_cache"}
-                >
-                  {toolsLoading === "clear_cache" ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Temizleniyor...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="h-4 w-4 mr-2" />
-                      Cache Temizle
-                    </>
-                  )}
-                </Button>
+                <div className="text-2xl font-bold">{analysis.overview.totalPages}</div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>SEO Raporu İndir</CardTitle>
-                <CardDescription>Detaylı SEO raporunu PDF olarak indir</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">İyi Sayfalar</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => executeTool("generate_report", "Rapor oluşturma")}
-                  disabled={toolsLoading === "generate_report"}
-                >
-                  {toolsLoading === "generate_report" ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Hazırlanıyor...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Rapor İndir
-                    </>
-                  )}
-                </Button>
+                <div className="text-2xl font-bold text-green-600">{analysis.overview.goodPages}</div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Yeniden Analiz Et</CardTitle>
-                <CardDescription>Tüm sayfaları yeniden analiz et</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Uyarı</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
               </CardHeader>
               <CardContent>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => executeTool("reanalyze", "Yeniden analiz")}
-                  disabled={toolsLoading === "reanalyze"}
-                >
-                  {toolsLoading === "reanalyze" ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Analiz ediliyor...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Yeniden Analiz Et
-                    </>
-                  )}
-                </Button>
+                <div className="text-2xl font-bold text-yellow-600">{analysis.overview.warningPages}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Hata</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{analysis.overview.errorPages}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Eksik Meta</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-orange-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">{analysis.overview.missingMeta}</div>
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-      </Tabs>
+
+          {/* Tabs */}
+          <Tabs defaultValue="analysis" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="analysis">Analiz</TabsTrigger>
+              <TabsTrigger value="redirects">Yönlendirmeler</TabsTrigger>
+              <TabsTrigger value="keywords">Anahtar Kelimeler</TabsTrigger>
+              <TabsTrigger value="competitors">Rakipler</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="analysis">
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Issues */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>SEO Sorunları</CardTitle>
+                    <CardDescription>Düzeltilmesi gereken sorunlar</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {analysis.issues.map((issue) => (
+                        <div key={issue.id} className="border rounded-lg p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              {getIssueIcon(issue.type)}
+                              <span className="font-medium">{issue.title}</span>
+                            </div>
+                            {getIssueBadge(issue.type)}
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{issue.description}</p>
+                          <div className="text-xs text-muted-foreground">
+                            <strong>Etki:</strong> {issue.impact}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            <strong>Etkilenen sayfalar:</strong> {issue.pages.length}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Recommendations */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Öneriler</CardTitle>
+                    <CardDescription>SEO performansını artırmak için öneriler</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {analysis.recommendations.map((rec) => (
+                        <div key={rec.id} className="border rounded-lg p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="font-medium">{rec.title}</span>
+                            <Badge variant="outline">{rec.category}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{rec.description}</p>
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>
+                              <strong>Etki:</strong> {rec.impact}
+                            </span>
+                            <span>
+                              <strong>Zorluk:</strong> {rec.effort}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="redirects">
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>URL Yönlendirmeleri</CardTitle>
+                      <CardDescription>301 ve 302 yönlendirmelerini yönetin</CardDescription>
+                    </div>
+                    <Dialog open={isCreateRedirectOpen} onOpenChange={setIsCreateRedirectOpen}>
+                      <DialogTrigger asChild>
+                        <Button>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Yeni Yönlendirme
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Yeni Yönlendirme</DialogTitle>
+                          <DialogDescription>URL yönlendirmesi oluşturun</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="from-url">Kaynak URL</Label>
+                            <Input
+                              id="from-url"
+                              value={newRedirect.fromUrl}
+                              onChange={(e) => setNewRedirect({ ...newRedirect, fromUrl: e.target.value })}
+                              placeholder="/eski-sayfa"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="to-url">Hedef URL</Label>
+                            <Input
+                              id="to-url"
+                              value={newRedirect.toUrl}
+                              onChange={(e) => setNewRedirect({ ...newRedirect, toUrl: e.target.value })}
+                              placeholder="/yeni-sayfa"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="redirect-type">Yönlendirme Türü</Label>
+                            <Select
+                              value={newRedirect.redirectType.toString()}
+                              onValueChange={(value) =>
+                                setNewRedirect({ ...newRedirect, redirectType: Number.parseInt(value) })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="301">301 - Kalıcı Yönlendirme</SelectItem>
+                                <SelectItem value="302">302 - Geçici Yönlendirme</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id="is-active"
+                              checked={newRedirect.isActive}
+                              onCheckedChange={(checked) => setNewRedirect({ ...newRedirect, isActive: checked })}
+                            />
+                            <Label htmlFor="is-active">Aktif</Label>
+                          </div>
+                          <Button onClick={handleCreateRedirect} disabled={isSaving} className="w-full">
+                            {isSaving ? "Oluşturuluyor..." : "Yönlendirme Oluştur"}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Kaynak URL</TableHead>
+                        <TableHead>Hedef URL</TableHead>
+                        <TableHead>Tür</TableHead>
+                        <TableHead>Durum</TableHead>
+                        <TableHead>Hit Sayısı</TableHead>
+                        <TableHead>İşlemler</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {redirects.map((redirect) => (
+                        <TableRow key={redirect.id}>
+                          <TableCell>
+                            <code className="text-sm">{redirect.fromUrl}</code>
+                          </TableCell>
+                          <TableCell>
+                            <code className="text-sm">{redirect.toUrl}</code>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={redirect.redirectType === 301 ? "default" : "secondary"}>
+                              {redirect.redirectType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={redirect.isActive ? "default" : "secondary"}>
+                              {redirect.isActive ? "Aktif" : "Pasif"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{redirect.hitCount}</TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Menüyü aç</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>İşlemler</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => handleEditRedirect(redirect)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Düzenle
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => window.open(redirect.fromUrl, "_blank")}>
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Test Et
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-red-600"
+                                  onClick={() => handleDeleteRedirect(redirect.id)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Sil
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="keywords">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Anahtar Kelime Performansı</CardTitle>
+                  <CardDescription>Anahtar kelimelerinizin sıralama performansı</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Anahtar Kelime</TableHead>
+                        <TableHead>Pozisyon</TableHead>
+                        <TableHead>Arama Hacmi</TableHead>
+                        <TableHead>Zorluk</TableHead>
+                        <TableHead>Trend</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {analysis.keywords.map((keyword, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{keyword.keyword}</TableCell>
+                          <TableCell>
+                            <Badge variant={keyword.position <= 10 ? "default" : "secondary"}>
+                              #{keyword.position}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{keyword.searchVolume.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                keyword.difficulty <= 30
+                                  ? "default"
+                                  : keyword.difficulty <= 60
+                                    ? "secondary"
+                                    : "destructive"
+                              }
+                            >
+                              {keyword.difficulty}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {keyword.trend === "up" ? (
+                              <TrendingUp className="h-4 w-4 text-green-500" />
+                            ) : keyword.trend === "down" ? (
+                              <TrendingDown className="h-4 w-4 text-red-500" />
+                            ) : (
+                              <div className="h-4 w-4 bg-gray-300 rounded-full" />
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="competitors">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Rakip Analizi</CardTitle>
+                  <CardDescription>Rakiplerinizin SEO performansı</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Domain</TableHead>
+                        <TableHead>SEO Skoru</TableHead>
+                        <TableHead>Ortak Anahtar Kelime</TableHead>
+                        <TableHead>Backlink Sayısı</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {analysis.competitors.map((competitor, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{competitor.domain}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                competitor.score >= 80
+                                  ? "default"
+                                  : competitor.score >= 60
+                                    ? "secondary"
+                                    : "destructive"
+                              }
+                            >
+                              {competitor.score}/100
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{competitor.commonKeywords}</TableCell>
+                          <TableCell>{competitor.backlinks.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+
+      {/* Edit Redirect Dialog */}
+      <Dialog open={isEditRedirectOpen} onOpenChange={setIsEditRedirectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Yönlendirme Düzenle</DialogTitle>
+            <DialogDescription>Yönlendirme bilgilerini güncelleyin</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-from-url">Kaynak URL</Label>
+              <Input
+                id="edit-from-url"
+                value={newRedirect.fromUrl}
+                onChange={(e) => setNewRedirect({ ...newRedirect, fromUrl: e.target.value })}
+                placeholder="/eski-sayfa"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-to-url">Hedef URL</Label>
+              <Input
+                id="edit-to-url"
+                value={newRedirect.toUrl}
+                onChange={(e) => setNewRedirect({ ...newRedirect, toUrl: e.target.value })}
+                placeholder="/yeni-sayfa"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-redirect-type">Yönlendirme Türü</Label>
+              <Select
+                value={newRedirect.redirectType.toString()}
+                onValueChange={(value) => setNewRedirect({ ...newRedirect, redirectType: Number.parseInt(value) })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="301">301 - Kalıcı Yönlendirme</SelectItem>
+                  <SelectItem value="302">302 - Geçici Yönlendirme</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="edit-is-active"
+                checked={newRedirect.isActive}
+                onCheckedChange={(checked) => setNewRedirect({ ...newRedirect, isActive: checked })}
+              />
+              <Label htmlFor="edit-is-active">Aktif</Label>
+            </div>
+            <Button onClick={handleUpdateRedirect} disabled={isSaving} className="w-full">
+              {isSaving ? "Güncelleniyor..." : "Yönlendirme Güncelle"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

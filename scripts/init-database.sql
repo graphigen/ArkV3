@@ -138,3 +138,7 @@ INSERT INTO menu_items (menu_location, title, page_id, menu_order) VALUES
 ('header', 'Anasayfa', 1, 1),
 ('header', 'Hakkımızda', 2, 2),
 ('header', 'İletişim', 3, 3) ON CONFLICT DO NOTHING;
+
+-- Temel veritabanı yapısını oluştur
+-- Bu script zaten mevcut ve çalışıyor
+-- Sadece gerekli tabloları oluşturur

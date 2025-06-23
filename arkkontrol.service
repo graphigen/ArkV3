@@ -1,0 +1,63 @@
+[Unit]
+Description=Ark Kontrol Website - Next.js Application
+Documentation=https://github.com/your-repo/arkkontrol-website
+After=network.target
+Wants=network.target
+
+[Service]
+Type=forking
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/arkkontrol
+
+# Environment Variables - Neon Database Configuration
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=DATABASE_URL=postgresql://neondb_owner:npg_htj6CH2SYioa@ep-long-sound-a4hecgzc-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require
+Environment=DATABASE_URL_UNPOOLED=postgresql://neondb_owner:npg_htj6CH2SYioa@ep-long-sound-a4hecgzc.us-east-1.aws.neon.tech/neondb?sslmode=require
+Environment=POSTGRES_URL=postgresql://neondb_owner:npg_htj6CH2SYioa@ep-long-sound-a4hecgzc-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require
+Environment=POSTGRES_URL_NON_POOLING=postgresql://neondb_owner:npg_htj6CH2SYioa@ep-long-sound-a4hecgzc.us-east-1.aws.neon.tech/neondb?sslmode=require
+Environment=POSTGRES_PRISMA_URL=postgresql://neondb_owner:npg_htj6CH2SYioa@ep-long-sound-a4hecgzc-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require
+
+# Database Parameters
+Environment=PGHOST=ep-long-sound-a4hecgzc-pooler.us-east-1.aws.neon.tech
+Environment=PGHOST_UNPOOLED=ep-long-sound-a4hecgzc.us-east-1.aws.neon.tech
+Environment=PGUSER=neondb_owner
+Environment=PGDATABASE=neondb
+Environment=PGPASSWORD=npg_htj6CH2SYioa
+
+# Stack Auth Configuration
+Environment=NEXT_PUBLIC_STACK_PROJECT_ID=14f06dcf-cb13-41d2-ad54-2065ae1a00ce
+Environment=NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY=pck_e9hahemepscmxst4dka109nj0t7hegmcgbbxbs1mr6va8
+Environment=STACK_SECRET_SERVER_KEY=ssk_vbabvvhdjx490z04m0pqhc6zf5pn415qygvbr2br5hewr
+
+# Site Configuration
+Environment=NEXT_PUBLIC_SITE_URL=https://yourdomain.com
+Environment=ADMIN_SECRET_KEY=your-super-secret-admin-key-here
+
+# PM2 Commands
+ExecStart=/usr/bin/pm2 start ecosystem.config.js --no-daemon
+ExecReload=/usr/bin/pm2 reload ecosystem.config.js
+ExecStop=/usr/bin/pm2 stop ecosystem.config.js
+
+# Service Configuration
+Restart=always
+RestartSec=10
+KillMode=mixed
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/arkkontrol /var/log/pm2 /tmp
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=arkkontrol
+
+[Install]
+WantedBy=multi-user.target

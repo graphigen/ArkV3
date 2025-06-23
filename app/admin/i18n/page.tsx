@@ -69,7 +69,7 @@ type I18nSettings = {
   url_strategy: string
 }
 
-export default function I18nManagement() {
+export default function LocalizationManagement() {
   const [activeTab, setActiveTab] = useState("translations")
   const [languages, setLanguages] = useState<Language[]>([])
   const [translationKeys, setTranslationKeys] = useState<TranslationKey[]>([])
@@ -265,7 +265,7 @@ export default function I18nManagement() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Dil Yönetimi</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Yerelleştirme</h1>
             <p className="text-muted-foreground">Çoklu dil desteği ve çevirileri yönetin</p>
           </div>
         </div>
@@ -281,7 +281,7 @@ export default function I18nManagement() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dil Yönetimi</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Yerelleştirme</h1>
           <p className="text-muted-foreground">Çoklu dil desteği ve çevirileri yönetin</p>
         </div>
         <div className="flex items-center gap-2">

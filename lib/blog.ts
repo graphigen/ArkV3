@@ -8,23 +8,23 @@ export interface BlogPost {
   slug: string
   excerpt?: string
   content: string
-  featuredImage?: string
-  authorId: number
-  categoryId?: number
+  featured_image?: string
+  author_id: number
+  category_id?: number
   tags?: string[]
   status: "draft" | "published" | "scheduled"
-  publishedAt?: Date
-  scheduledAt?: Date
-  metaTitle?: string
-  metaDescription?: string
-  readingTime?: number
-  viewCount?: number
-  likeCount?: number
-  commentCount?: number
-  isCommentEnabled?: boolean
-  isFeatured?: boolean
-  createdAt?: Date
-  updatedAt?: Date
+  published_at?: Date
+  scheduled_at?: Date
+  meta_title?: string
+  meta_description?: string
+  reading_time?: number
+  views?: number
+  like_count?: number
+  comment_count?: number
+  is_comment_enabled?: boolean
+  is_featured?: boolean
+  created_at?: Date
+  updated_at?: Date
 }
 
 export interface BlogCategory {
@@ -33,22 +33,22 @@ export interface BlogCategory {
   slug: string
   description?: string
   color?: string
-  postCount?: number
-  isActive?: boolean
+  post_count?: number
+  is_active?: boolean
 }
 
 export interface BlogComment {
   id: number
-  postId: number
-  parentId?: number
-  authorName: string
-  authorEmail: string
-  authorWebsite?: string
+  post_id: number
+  parent_id?: number
+  author_name: string
+  author_email: string
+  author_website?: string
   content: string
   status: "pending" | "approved" | "spam" | "rejected"
-  ipAddress?: string
-  userAgent?: string
-  createdAt?: Date
+  ip_address?: string
+  user_agent?: string
+  created_at?: Date
 }
 
 // Blog Posts Functions
@@ -59,13 +59,28 @@ export async function getAllBlogPosts(options?: {
   page?: number
 }): Promise<BlogPost[]> {
   try {
+    if (!options || (!options.status && !options.category && !options.limit)) {
+      return await sql`
+        SELECT 
+          bp.id, bp.title, bp.slug, bp.excerpt, bp.content,
+          bp.featured_image, bp.status, bp.published_at, 
+          bp.views, bp.reading_time, bp.tags,
+          bp.created_at, bp.updated_at,
+          bp.author_id, bp.category_id,
+          bc.name as category_name, bc.slug as category_slug
+        FROM blog_posts bp
+        LEFT JOIN blog_categories bc ON bp.category_id = bc.id
+        ORDER BY bp.created_at DESC
+      `
+    }
+
     let query = `
       SELECT 
         bp.id, bp.title, bp.slug, bp.excerpt, bp.content,
-        bp.featured_image as "featuredImage", bp.status, bp.published_at as "publishedAt", 
-        bp.views as "viewCount", bp.reading_time as "readingTime", bp.tags,
-        bp.created_at as "createdAt", bp.updated_at as "updatedAt",
-        bp.author_id as "authorId", bp.category_id as "categoryId",
+        bp.featured_image, bp.status, bp.published_at, 
+        bp.views, bp.reading_time, bp.tags,
+        bp.created_at, bp.updated_at,
+        bp.author_id, bp.category_id,
         bc.name as category_name, bc.slug as category_slug
       FROM blog_posts bp
       LEFT JOIN blog_categories bc ON bp.category_id = bc.id
@@ -75,13 +90,13 @@ export async function getAllBlogPosts(options?: {
     const params: any[] = []
     let paramIndex = 1
 
-    if (options?.status && options.status !== "all") {
+    if (options.status && options.status !== "all") {
       query += ` AND bp.status = $${paramIndex}`
       params.push(options.status)
       paramIndex++
     }
 
-    if (options?.category && options.category !== "all") {
+    if (options.category && options.category !== "all") {
       query += ` AND bp.category_id = $${paramIndex}`
       params.push(Number.parseInt(options.category))
       paramIndex++
@@ -89,14 +104,12 @@ export async function getAllBlogPosts(options?: {
 
     query += ` ORDER BY bp.created_at DESC`
 
-    if (options?.limit) {
+    if (options.limit) {
       query += ` LIMIT $${paramIndex}`
       params.push(options.limit)
-      paramIndex++
     }
 
-    const result = await sql(query, params)
-    return result as BlogPost[]
+    return await sql.query(query, params)
   } catch (error) {
     console.error("Error fetching blog posts:", error)
     return []
@@ -108,10 +121,10 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
     const result = await sql`
       SELECT 
         bp.id, bp.title, bp.slug, bp.excerpt, bp.content,
-        bp.featured_image as "featuredImage", bp.status, bp.published_at as "publishedAt",
-        bp.views as "viewCount", bp.reading_time as "readingTime", bp.tags,
-        bp.created_at as "createdAt", bp.updated_at as "updatedAt",
-        bp.author_id as "authorId", bp.category_id as "categoryId",
+        bp.featured_image, bp.status, bp.published_at,
+        bp.views, bp.reading_time, bp.tags,
+        bp.created_at, bp.updated_at,
+        bp.author_id, bp.category_id,
         bc.name as category_name, bc.slug as category_slug
       FROM blog_posts bp
       LEFT JOIN blog_categories bc ON bp.category_id = bc.id
@@ -119,7 +132,6 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
     `
 
     if (result[0]) {
-      // Increment view count
       await sql`
         UPDATE blog_posts 
         SET views = COALESCE(views, 0) + 1 
@@ -134,7 +146,30 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
   }
 }
 
-export async function createBlogPost(post: Omit<BlogPost, "id" | "createdAt" | "updatedAt">): Promise<BlogPost | null> {
+export async function getBlogPostById(id: number): Promise<BlogPost | null> {
+  try {
+    const result = await sql`
+      SELECT 
+        bp.id, bp.title, bp.slug, bp.excerpt, bp.content,
+        bp.featured_image, bp.status, bp.published_at,
+        bp.views, bp.reading_time, bp.tags,
+        bp.created_at, bp.updated_at,
+        bp.author_id, bp.category_id,
+        bc.name as category_name, bc.slug as category_slug
+      FROM blog_posts bp
+      LEFT JOIN blog_categories bc ON bp.category_id = bc.id
+      WHERE bp.id = ${id}
+    `
+    return result[0] || null
+  } catch (error) {
+    console.error(`Error fetching post by id ${id}:`, error)
+    return null
+  }
+}
+
+export async function createBlogPost(
+  post: Omit<BlogPost, "id" | "created_at" | "updated_at">,
+): Promise<BlogPost | null> {
   try {
     const result = await sql`
       INSERT INTO blog_posts (
@@ -143,9 +178,9 @@ export async function createBlogPost(post: Omit<BlogPost, "id" | "createdAt" | "
         reading_time
       ) VALUES (
         ${post.title}, ${post.slug}, ${post.excerpt}, ${post.content},
-        ${post.featuredImage}, ${post.authorId}, ${post.categoryId},
-        ${JSON.stringify(post.tags)}, ${post.status}, ${post.publishedAt},
-        ${post.metaTitle}, ${post.metaDescription}, ${post.readingTime}
+        ${post.featured_image}, ${post.author_id}, ${post.category_id},
+        ${JSON.stringify(post.tags)}, ${post.status}, ${post.published_at},
+        ${post.meta_title}, ${post.meta_description}, ${post.reading_time}
       )
       RETURNING *
     `
@@ -165,14 +200,14 @@ export async function updateBlogPost(id: number, post: Partial<BlogPost>): Promi
         slug = COALESCE(${post.slug}, slug),
         excerpt = COALESCE(${post.excerpt}, excerpt),
         content = COALESCE(${post.content}, content),
-        featured_image = COALESCE(${post.featuredImage}, featured_image),
-        category_id = COALESCE(${post.categoryId}, category_id),
+        featured_image = COALESCE(${post.featured_image}, featured_image),
+        category_id = COALESCE(${post.category_id}, category_id),
         tags = COALESCE(${JSON.stringify(post.tags)}, tags),
         status = COALESCE(${post.status}, status),
-        published_at = COALESCE(${post.publishedAt}, published_at),
-        meta_title = COALESCE(${post.metaTitle}, meta_title),
-        meta_description = COALESCE(${post.metaDescription}, meta_description),
-        reading_time = COALESCE(${post.readingTime}, reading_time),
+        published_at = COALESCE(${post.published_at}, published_at),
+        meta_title = COALESCE(${post.meta_title}, meta_title),
+        meta_description = COALESCE(${post.meta_description}, meta_description),
+        reading_time = COALESCE(${post.reading_time}, reading_time),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${id}
       RETURNING *
@@ -195,25 +230,28 @@ export async function deleteBlogPost(id: number): Promise<boolean> {
 }
 
 // Blog Categories Functions
-export async function getAllCategories(): Promise<BlogCategory[]> {
+export async function getAllBlogCategories(): Promise<BlogCategory[]> {
   try {
-    const result = await sql`
+    return await sql`
       SELECT 
         bc.id, bc.name, bc.slug, bc.description, bc.color,
-        COUNT(bp.id) as "postCount"
+        COUNT(bp.id) as post_count
       FROM blog_categories bc
       LEFT JOIN blog_posts bp ON bc.id = bp.category_id AND bp.status = 'published'
       GROUP BY bc.id, bc.name, bc.slug, bc.description, bc.color
       ORDER BY bc.name
     `
-    return result as BlogCategory[]
   } catch (error) {
     console.error("Error fetching categories:", error)
     return []
   }
 }
 
-export async function createCategory(category: Omit<BlogCategory, "id" | "postCount">): Promise<BlogCategory | null> {
+export async function getAllCategories(): Promise<BlogCategory[]> {
+  return getAllBlogCategories()
+}
+
+export async function createCategory(category: Omit<BlogCategory, "id" | "post_count">): Promise<BlogCategory | null> {
   try {
     const result = await sql`
       INSERT INTO blog_categories (name, slug, description, color)

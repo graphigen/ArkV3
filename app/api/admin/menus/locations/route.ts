@@ -1,50 +1,88 @@
 import { NextResponse } from "next/server"
+import { neon } from "@neondatabase/serverless"
 
-// Mock menu locations data
-const mockMenuLocations = [
-  {
-    location_key: "header",
-    location_name: "Üst Menü (Header)",
-    description: "Sitenin üst kısmında görünen ana navigasyon menüsü",
-    is_active: true,
-    max_depth: 2,
-    created_at: new Date("2024-01-01"),
-    updated_at: new Date("2024-01-01"),
-  },
-  {
-    location_key: "footer",
-    location_name: "Alt Menü (Footer)",
-    description: "Sitenin alt kısmında görünen menü",
-    is_active: true,
-    max_depth: 1,
-    created_at: new Date("2024-01-01"),
-    updated_at: new Date("2024-01-01"),
-  },
-  {
-    location_key: "sidebar",
-    location_name: "Yan Menü (Sidebar)",
-    description: "Sayfa kenarında görünen menü",
-    is_active: true,
-    max_depth: 3,
-    created_at: new Date("2024-01-01"),
-    updated_at: new Date("2024-01-01"),
-  },
-  {
-    location_key: "mobile",
-    location_name: "Mobil Menü",
-    description: "Mobil cihazlarda görünen menü",
-    is_active: true,
-    max_depth: 2,
-    created_at: new Date("2024-01-01"),
-    updated_at: new Date("2024-01-01"),
-  },
-]
+const sql = neon(process.env.DATABASE_URL!)
 
 export async function GET() {
   try {
-    return NextResponse.json(mockMenuLocations)
+    // Önce veritabanından mevcut konumları kontrol et
+    const existingLocations = await sql`
+      SELECT location_key, location_name, description, is_active 
+      FROM menu_locations 
+      WHERE is_active = true 
+      ORDER BY location_name
+    `
+
+    // Eğer hiç konum yoksa, varsayılan konumları ekle
+    if (existingLocations.length === 0) {
+      const defaultLocations = [
+        {
+          location_key: "header",
+          location_name: "Ana Menü",
+          description: "Site üst kısmındaki ana navigasyon menüsü",
+        },
+        {
+          location_key: "mobile",
+          location_name: "Mobil Menü",
+          description: "Mobil cihazlar için hamburger menüsü",
+        },
+        {
+          location_key: "footer",
+          location_name: "Footer Menü",
+          description: "Site alt kısmındaki footer menüsü",
+        },
+        {
+          location_key: "sidebar",
+          location_name: "Yan Menü",
+          description: "Sayfa yan tarafındaki menü",
+        },
+      ]
+
+      // Varsayılan konumları ekle
+      for (const location of defaultLocations) {
+        await sql`
+          INSERT INTO menu_locations (location_key, location_name, description, is_active)
+          VALUES (${location.location_key}, ${location.location_name}, ${location.description}, true)
+          ON CONFLICT (location_key) DO NOTHING
+        `
+      }
+
+      // Güncellenmiş listeyi getir
+      const updatedLocations = await sql`
+        SELECT location_key, location_name, description, is_active 
+        FROM menu_locations 
+        WHERE is_active = true 
+        ORDER BY location_name
+      `
+      return NextResponse.json(updatedLocations)
+    }
+
+    return NextResponse.json(existingLocations)
   } catch (error) {
-    console.error("Error in GET /api/admin/menus/locations:", error)
-    return NextResponse.json({ error: "Menü konumları yüklenemedi" }, { status: 500 })
+    console.error("Menu locations fetch error:", error)
+
+    // Hata durumunda varsayılan konumları döndür
+    const fallbackLocations = [
+      {
+        location_key: "header",
+        location_name: "Ana Menü",
+        description: "Site üst kısmındaki ana navigasyon menüsü",
+        is_active: true,
+      },
+      {
+        location_key: "mobile",
+        location_name: "Mobil Menü",
+        description: "Mobil cihazlar için hamburger menüsü",
+        is_active: true,
+      },
+      {
+        location_key: "footer",
+        location_name: "Footer Menü",
+        description: "Site alt kısmındaki footer menüsü",
+        is_active: true,
+      },
+    ]
+
+    return NextResponse.json(fallbackLocations)
   }
 }

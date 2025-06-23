@@ -1,90 +1,99 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createMediaItem, getMediaItems } from "@/lib/media"
-import { auth } from "@/lib/auth"
+import { neon } from "@neondatabase/serverless"
+
+const sql = neon(process.env.DATABASE_URL!)
 
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
-    const session = await auth()
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { searchParams } = new URL(request.url)
+    const folder_id = searchParams.get("folder_id")
+    const file_type = searchParams.get("file_type")
+    const search = searchParams.get("search")
+    const limit = Number.parseInt(searchParams.get("limit") || "50")
+
+    let query = `
+      SELECT 
+        mf.id, mf.filename, mf.original_filename, mf.file_path, mf.file_size,
+        mf.mime_type, mf.file_type, mf.width, mf.height, mf.alt_text, mf.caption,
+        mf.description, mf.tags, mf.folder_id, mf.is_public, mf.created_at, mf.updated_at,
+        folder.name as folder_name
+      FROM media_files mf
+      LEFT JOIN media_folders folder ON mf.folder_id = folder.id
+      WHERE 1=1
+    `
+    const params: any[] = []
+    let paramIndex = 1
+
+    if (folder_id) {
+      query += ` AND mf.folder_id = $${paramIndex}`
+      params.push(Number.parseInt(folder_id))
+      paramIndex++
     }
 
-    // Parse query parameters
-    const searchParams = request.nextUrl.searchParams
-    const search = searchParams.get("search") || ""
-    const type = searchParams.get("type") || ""
-    const folderId = searchParams.get("folder_id") ? Number.parseInt(searchParams.get("folder_id")!) : undefined
-    const tags = searchParams.get("tags") ? searchParams.get("tags")!.split(",") : []
-    const page = Number.parseInt(searchParams.get("page") || "1")
-    const limit = Number.parseInt(searchParams.get("limit") || "20")
-    const sortBy = searchParams.get("sort_by") || "created_at"
-    const sortOrder = (searchParams.get("sort_order") || "desc") as "asc" | "desc"
+    if (file_type && file_type !== "all") {
+      query += ` AND mf.file_type = $${paramIndex}`
+      params.push(file_type)
+      paramIndex++
+    }
 
-    const result = await getMediaItems({
-      search,
-      type,
-      folder_id: folderId,
-      tags,
-      page,
-      limit,
-      sort_by: sortBy,
-      sort_order: sortOrder,
-    })
+    if (search) {
+      query += ` AND (mf.filename ILIKE $${paramIndex} OR mf.original_filename ILIKE $${paramIndex} OR mf.alt_text ILIKE $${paramIndex})`
+      params.push(`%${search}%`)
+      paramIndex++
+    }
 
-    return NextResponse.json(result)
-  } catch (error: any) {
-    console.error("Error fetching media:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    query += ` ORDER BY mf.created_at DESC LIMIT $${paramIndex}`
+    params.push(limit)
+
+    const files = await sql.query(query, params)
+    return NextResponse.json(files || [])
+  } catch (error) {
+    console.error("Media API Error:", error)
+    return NextResponse.json({ error: "Failed to fetch media files" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const session = await auth()
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const data = await request.json()
+    const {
+      filename,
+      original_filename,
+      file_path,
+      file_size,
+      mime_type,
+      file_type,
+      width,
+      height,
+      alt_text,
+      caption,
+      description,
+      tags,
+      folder_id,
+      uploaded_by,
+      is_public,
+    } = data
+
+    if (!filename || !file_path || !file_size || !mime_type) {
+      return NextResponse.json({ error: "Required fields missing" }, { status: 400 })
     }
 
-    const formData = await request.formData()
-    const file = formData.get("file") as File
+    const result = await sql`
+      INSERT INTO media_files (
+        filename, original_filename, file_path, file_size, mime_type, file_type,
+        width, height, alt_text, caption, description, tags, folder_id, uploaded_by, is_public
+      )
+      VALUES (
+        ${filename}, ${original_filename || filename}, ${file_path}, ${file_size}, ${mime_type}, ${file_type || "other"},
+        ${width || null}, ${height || null}, ${alt_text || null}, ${caption || null}, ${description || null}, 
+        ${tags || []}, ${folder_id || null}, ${uploaded_by || null}, ${is_public !== false}
+      )
+      RETURNING *
+    `
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 })
-    }
-
-    // Convert File to buffer for processing
-    const buffer = Buffer.from(await file.arrayBuffer())
-
-    // Extract metadata from formData
-    const altText = (formData.get("alt_text") as string) || ""
-    const title = (formData.get("title") as string) || ""
-    const description = (formData.get("description") as string) || ""
-    const tags = (formData.get("tags") as string) || ""
-    const folderId = formData.get("folder_id") ? Number.parseInt(formData.get("folder_id") as string) : undefined
-
-    // Create media item
-    const mediaItem = await createMediaItem(
-      {
-        alt_text: altText,
-        title: title,
-        description: description,
-        tags: tags ? tags.split(",") : [],
-        folder_id: folderId,
-        uploaded_by: session.user?.id,
-      },
-      {
-        originalname: file.name,
-        mimetype: file.type,
-        size: file.size,
-        buffer,
-      },
-    )
-
-    return NextResponse.json(mediaItem)
-  } catch (error: any) {
-    console.error("Error uploading media:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(result[0], { status: 201 })
+  } catch (error) {
+    console.error("Media file creation error:", error)
+    return NextResponse.json({ error: "Failed to create media file" }, { status: 500 })
   }
 }
