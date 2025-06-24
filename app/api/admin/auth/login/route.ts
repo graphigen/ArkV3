@@ -1,48 +1,46 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
-import bcrypt from "bcryptjs"
+import { setAuthCookie } from "@/lib/auth"
+import bcrypt from "bcryptjs" // bcryptjs import edildi
 
 const sql = neon(process.env.DATABASE_URL!)
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json()
+    const { email, password } = await request.json()
 
-    // Kullanıcıyı database'den bul
-    const [user] = await sql`
-      SELECT * FROM users 
-      WHERE username = ${username} AND status = 'active'
-    `
-
-    if (!user) {
-      return NextResponse.json({ error: "Kullanıcı bulunamadı" }, { status: 401 })
+    if (!email || !password) {
+      return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
     }
 
-    // Demo için basit şifre kontrolü (production'da bcrypt kullanın)
-    const isValidPassword = password === "arkkontrol2025!" || (await bcrypt.compare(password, user.password_hash))
-
-    if (!isValidPassword) {
-      return NextResponse.json({ error: "Geçersiz şifre" }, { status: 401 })
-    }
-
-    // Son giriş zamanını güncelle
-    await sql`
-      UPDATE users 
-      SET last_login = CURRENT_TIMESTAMP 
-      WHERE id = ${user.id}
+    const users = await sql`
+      SELECT id, email, password_hash, role, status 
+      FROM admin_users 
+      WHERE email = ${email.toLowerCase()}
     `
 
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
-    })
+    if (users.length === 0) {
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
+    }
+
+    const user = users[0]
+
+    if (user.status !== "active") {
+      return NextResponse.json({ error: "User account is not active. Please contact administrator." }, { status: 403 })
+    }
+
+    const passwordMatch = bcrypt.compareSync(password, user.password_hash)
+
+    if (!passwordMatch) {
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
+    }
+
+    // Set auth cookie with user ID and role
+    setAuthCookie(user.id, user.role)
+
+    return NextResponse.json({ success: true, message: "Login successful", role: user.role, userId: user.id })
   } catch (error) {
     console.error("Login error:", error)
-    return NextResponse.json({ error: "Giriş hatası" }, { status: 500 })
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }
